@@ -6,12 +6,21 @@ on:
   pull_request:
     branches: [main]
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+# Required for the deploy-pages action
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
+# Allow only one concurrent deployment
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Build ────────────────────────────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -38,10 +47,23 @@ jobs:
       - name: Build WASM (release)
         run: wasm-pack build --target web --out-dir www/pkg
 
-      - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./www
-          force_orphan: true
+          path: ./www
+
+  # ── 2. Deploy (main branch only) ────────────────────────────────────────
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
