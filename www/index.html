@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DQN in Rust/WASM</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 900px; }
+    button { margin-right: 0.5rem; margin-bottom: 0.5rem; padding: 0.6rem 1rem; }
+    pre { background: #111; color: #0f0; padding: 1rem; overflow: auto; }
+    canvas { border: 1px solid #ccc; display: block; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <h1>DQN in Rust + WebAssembly</h1>
+  <p>
+    This demo implements the core DQN loop from Mnih et al.'s Atari work, adapted to CartPole for browser execution.
+  </p>
+
+  <button id="train1">Train 1 episode</button>
+  <button id="train50">Train 50 episodes</button>
+  <button id="run">Run greedy policy</button>
+  <button id="reset">Reset</button>
+
+  <canvas id="canvas" width="600" height="240"></canvas>
+  <pre id="log"></pre>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
