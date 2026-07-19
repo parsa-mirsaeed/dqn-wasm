@@ -1,29 +1,108 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DQN in Rust/WASM</title>
+  <title>DQN · Rust + WebAssembly</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 900px; }
-    button { margin-right: 0.5rem; margin-bottom: 0.5rem; padding: 0.6rem 1rem; }
-    pre { background: #111; color: #0f0; padding: 1rem; overflow: auto; }
-    canvas { border: 1px solid #ccc; display: block; margin: 1rem 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1117; color: #e6edf3;
+      min-height: 100vh; padding: 2rem;
+    }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .subtitle { color: #8b949e; font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .subtitle a { color: #58a6ff; text-decoration: none; }
+    .layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; max-width: 1100px; }
+    @media(max-width:760px){ .layout { grid-template-columns: 1fr; } }
+    .card {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 8px; padding: 1rem;
+    }
+    .card h2 { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: .05em; }
+    canvas { width: 100%; border-radius: 6px; display: block; }
+    .controls { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    button {
+      padding: 0.45rem 1rem; border-radius: 6px; border: 1px solid #30363d;
+      background: #21262d; color: #e6edf3; cursor: pointer; font-size: 0.875rem;
+      transition: background 0.15s;
+    }
+    button:hover { background: #30363d; }
+    button.primary { background: #1f6feb; border-color: #1f6feb; }
+    button.primary:hover { background: #388bfd; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+    .stat { background: #0d1117; border-radius: 6px; padding: 0.6rem 0.8rem; }
+    .stat .label { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; letter-spacing: .04em; }
+    .stat .value { font-size: 1.3rem; font-weight: 700; color: #58a6ff; font-variant-numeric: tabular-nums; }
+    #chart { width: 100%; height: 180px; }
+    .log-wrap { height: 280px; overflow-y: auto; }
+    pre#log {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.72rem; line-height: 1.6;
+      color: #7ee787; white-space: pre-wrap;
+    }
+    .paper-ref {
+      background: #0d1117; border-left: 3px solid #1f6feb;
+      padding: 0.75rem 1rem; border-radius: 0 6px 6px 0;
+      font-size: 0.8rem; color: #8b949e; margin-top: 1rem;
+    }
+    .paper-ref strong { color: #e6edf3; }
   </style>
 </head>
 <body>
   <h1>DQN in Rust + WebAssembly</h1>
-  <p>
-    This demo implements the core DQN loop from Mnih et al.'s Atari work, adapted to CartPole for browser execution.
+  <p class="subtitle">
+    Implementation of
+    <a href="https://arxiv.org/abs/1312.5602" target="_blank">Mnih et al. 2013 &middot; arXiv:1312.5602</a>
+    &mdash; CartPole environment &middot; fully in-browser via wasm-bindgen
   </p>
 
-  <button id="train1">Train 1 episode</button>
-  <button id="train50">Train 50 episodes</button>
-  <button id="run">Run greedy policy</button>
-  <button id="reset">Reset</button>
+  <div class="layout">
+    <div>
+      <div class="card" style="margin-bottom:1rem">
+        <h2>Environment</h2>
+        <canvas id="env" height="200"></canvas>
+      </div>
+      <div class="card">
+        <h2>Reward per episode</h2>
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="paper-ref">
+        <strong>Reference:</strong> V. Mnih et al., &ldquo;Playing Atari with Deep Reinforcement Learning,&rdquo;
+        <em>arXiv:1312.5602</em>, 2013. Algorithm 1 is implemented faithfully;
+        CartPole + MLP replaces Atari + CNN for browser execution.
+        See <a href="https://github.com/parsa-mirsaeed/dqn-wasm/blob/main/PAPER.md" style="color:#58a6ff">PAPER.md</a> for line-by-line algorithm mapping.
+      </div>
+    </div>
 
-  <canvas id="canvas" width="600" height="240"></canvas>
-  <pre id="log"></pre>
+    <div>
+      <div class="card" style="margin-bottom:1rem">
+        <h2>Controls</h2>
+        <div class="controls">
+          <button id="btn1" class="primary">Train 1 ep</button>
+          <button id="btn10">Train 10 ep</button>
+          <button id="btn100">Train 100 ep</button>
+          <button id="btnRun">&#9654; Run greedy</button>
+          <button id="btnReset">Reset agent</button>
+        </div>
+        <div class="stat-grid">
+          <div class="stat"><div class="label">Episode</div><div class="value" id="sEp">0</div></div>
+          <div class="stat"><div class="label">Last reward</div><div class="value" id="sRew">-</div></div>
+          <div class="stat"><div class="label">Epsilon</div><div class="value" id="sEps">1.000</div></div>
+          <div class="stat"><div class="label">Buffer</div><div class="value" id="sBuf">0</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Training log</h2>
+        <div class="log-wrap">
+          <pre id="log">Agent ready. Press Train to start.
+</pre>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="./main.js"></script>
 </body>

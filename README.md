@@ -1,73 +1,123 @@
-# DQN in Rust + WebAssembly
+# DQN · Rust + WebAssembly
 
-A browser-runnable implementation of **Deep Q-Networks (DQN)** inspired by the paper **"Playing Atari with Deep Reinforcement Learning"** by Mnih et al. [arXiv:1312.5602](https://arxiv.org/abs/1312.5602).
+[![CI](https://github.com/parsa-mirsaeed/dqn-wasm/actions/workflows/ci.yml/badge.svg)](https://github.com/parsa-mirsaeed/dqn-wasm/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-GitHub%20Pages-blue)](https://parsa-mirsaeed.github.io/dqn-wasm/)
+[![arXiv](https://img.shields.io/badge/paper-arXiv%3A1312.5602-b31b1b)](https://arxiv.org/abs/1312.5602)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-This repo intentionally implements the **core logic faithfully** while using a smaller benchmark environment, **CartPole**, so the algorithm can run directly in the browser through **Rust + wasm-bindgen + JavaScript**.
+A **research-grade browser demo** of **Deep Q-Networks (DQN)** from:
 
-## What is implemented
+> V. Mnih et al., *"Playing Atari with Deep Reinforcement Learning"*, arXiv:1312.5602, 2013
+> (Nature version: DOI [10.1038/nature14236](https://doi.org/10.1038/nature14236))
 
-Core DQN ingredients from the paper:
+Full **Algorithm 1** from the paper is implemented in **pure Rust**, compiled to
+**WebAssembly** with `wasm-bindgen`, and rendered in the browser with vanilla JavaScript.
 
-- Q-network updated by temporal-difference learning
-- Experience replay buffer
-- Fixed target network
-- Epsilon-greedy exploration
-- Mini-batch updates with MSE TD loss
+---
 
-## Deliberate simplifications
+## Live demo
 
-The original paper learns from raw Atari pixels using a convolutional neural network and frame stacking. This implementation uses:
+**[parsa-mirsaeed.github.io/dqn-wasm](https://parsa-mirsaeed.github.io/dqn-wasm/)**
 
-- low-dimensional state vectors instead of image input
-- a small MLP instead of a CNN
-- CartPole dynamics instead of Atari
+---
 
-These changes preserve the algorithmic idea while making the project practical for a public browser demo.
+## What this implements
 
-## Repo layout
+All core components of Algorithm 1 (paper §4):
 
-- `src/lib.rs` — DQN agent, replay buffer, neural net, CartPole env, wasm exports
-- `www/index.html` — browser UI
-- `www/main.js` — JS integration with the WASM module
-- `Cargo.toml` — Rust package config
+| Component | Paper | Code |
+|---|---|---|
+| Experience replay | §4.1 | `ReplayBuffer` in `src/lib.rs` |
+| Target Q-network | Algorithm 1, line 10 | `self.target = self.online.clone()` |
+| epsilon-greedy exploration | Eq. 1 | `if randf() < self.epsilon` |
+| TD target y_j | Algorithm 1, line 11 | `let y = if done { r } else { r + gamma*max Q_hat }` |
+| Mini-batch SGD | Algorithm 1, line 11 | `sgd_step()` with manual backprop |
 
-## Run locally
+See [`PAPER.md`](PAPER.md) for a **line-by-line mapping** of Algorithm 1 to Rust code,
+and a hyperparameter correspondence table.
+
+---
+
+## Repo structure
+
+```
+|- src/lib.rs              # DQN agent, CartPole env, MLP, replay buffer, unit tests
+|- www/
+|   |- index.html          # Browser UI
+|   |- main.js             # JS glue layer
+|   `- pkg/                # wasm-pack output (after build)
+|- Cargo.toml
+|- PAPER.md                # Paper reference + algorithm mapping table
+|- .github/workflows/ci.yml
+`- LICENSE
+```
+
+---
+
+## Build & run locally
 
 ### Prerequisites
 
-- Rust stable
-- `wasm-pack`
-- a static file server such as `python -m http.server`
+```bash
+# Rust stable
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-### Build
+# wasm-pack
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+```
+
+### Build WASM
 
 ```bash
-wasm-pack build --target web
+wasm-pack build --target web --out-dir www/pkg
 ```
 
 ### Serve
 
-From the repository root:
-
 ```bash
-python -m http.server 8000
+python -m http.server 8000 --directory www
+# or: npx serve www
 ```
 
-Then open:
+Open: http://localhost:8000
 
-- [http://localhost:8000/www/](http://localhost:8000/www/)
+### Run unit tests (native)
 
-## Notes on accuracy
+```bash
+cargo test --lib
+```
 
-This repository is a **reference implementation of DQN-style learning**, not a claim of exact Atari reproduction. The implementation keeps the learning rule and architectural ideas clear and auditable in Rust.
+---
+
+## CI & GitHub Pages
+
+On every push to `main`, GitHub Actions:
+1. Installs Rust + wasm-pack
+2. Runs `cargo test --lib` (5 unit tests)
+3. Builds WASM in release mode
+4. Deploys `www/` to GitHub Pages
+
+---
+
+## Deliberate adaptations
+
+The original paper uses Atari 2600 pixel frames + a CNN + frame stacking.
+This repo uses **CartPole** + **MLP** for practical browser execution.
+The algorithmic logic (replay, target net, TD learning) is unchanged.
+See [`PAPER.md`](PAPER.md) for full details.
+
+---
 
 ## Reference
 
 ```bibtex
 @article{mnih2013playing,
-  title={Playing Atari with Deep Reinforcement Learning},
-  author={Mnih, Volodymyr and Kavukcuoglu, Koray and Silver, David and Graves, Alex and Antonoglou, Ioannis and Wierstra, Daan and Riedmiller, Martin},
-  journal={arXiv preprint arXiv:1312.5602},
-  year={2013}
+  title   = {Playing Atari with Deep Reinforcement Learning},
+  author  = {Mnih, Volodymyr and Kavukcuoglu, Koray and Silver, David and
+             Graves, Alex and Antonoglou, Ioannis and Wierstra, Daan and
+             Riedmiller, Martin},
+  journal = {arXiv preprint arXiv:1312.5602},
+  year    = {2013},
+  url     = {https://arxiv.org/abs/1312.5602}
 }
 ```
